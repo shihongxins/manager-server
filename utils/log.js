@@ -1,6 +1,7 @@
 /**
+ * @file /utils/log.js
  * @author shihongxins
- * @description 封装 log4js 日志存储
+ * @description 封装 log4js 日志存储对象 logger
  */
 const log4js  = require('log4js')
 const levels = {
@@ -56,40 +57,40 @@ log4js.configure({
 })
 
 /**
- * @param {String} content 
+ * @param {Object} data 
  * @description debug 级别的日志输出，输出到 console 控制台
  */
-exports.debug = (content) => {
+exports.debug = (data) => {
   // 按输出类别获取 logger 实例，此处 console 为默认，可省略
   const logger = log4js.getLogger()
   // 设置 logger 实例的触发级别为 debug
   logger.level = levels.debug
   // 触发此 logger 实例的日志输出
-  logger.debug(content)
+  logger.debug(data)
 }
 
 /**
- * @param {String} content 
+ * @param {Object} data 
  * @description info 级别的日志输出，输出到 console 控制台和 info.log 文件
  */
-exports.info = (content) => {
+exports.info = (data) => {
   // 按输出类别获取 logger 实例，此处使用 output 输出类别
   const logger = log4js.getLogger('output')
   // 设置 logger 实例的触发级别为 debug
   logger.level = levels.info
   // 触发此 logger 实例的日志输出
-  logger.info(content)
+  logger.info(data)
 }
 
 /**
- * @param {String} content 
+ * @param {Object} data 
  * @description error 级别的日志输出，输出到 console 控制台和 info.log 文件，同时按天数保存错误日志文件
  */
-exports.error = (content) => {
+exports.error = (data) => {
   // 按输出类别获取 logger 实例，此处使用 error 输出类别
   const logger = log4js.getLogger('outputError')
   // 设置 logger 实例的触发级别为 error
   logger.level = levels.error
   // 触发此 logger 实例的日志输出
-  logger.error(content)
+  logger.error(data)
 }

@@ -4,24 +4,8 @@ const views = require('koa-views')
 const json = require('koa-json')
 const onerror = require('koa-onerror')
 const bodyparser = require('koa-bodyparser')
-// const logger = require('koa-logger')
-
-const index = require('./routes/index')
-const users = require('./routes/users')
-
-// 引入自定义封装的 log4js 的 logger 对象
+// 引入封装的 log4js
 const logger = require('./utils/log')
-// 尝试使用 logger 记录日志
-// 1 普通 debugger 输出信息
-logger.debug("这是自定义封装的 log4js 输出的 debugger 信息")
-// 2 普通 info 输出到 console 控制台和 info.log 文件
-logger.info("这是自定义封装的 log4js 输出的 info 信息")
-// 2 测试 error 输出到 console 控制台和 info.log 文件，同时按天数保存错误日志文件
-try {
-  undefined.toString()
-} catch (e) {
-  logger.error(e.message)
-}
 
 // error handler
 onerror(app)
@@ -31,7 +15,6 @@ app.use(bodyparser({
   enableTypes:['json', 'form', 'text']
 }))
 app.use(json())
-// app.use(logger())
 app.use(require('koa-static')(__dirname + '/public'))
 
 app.use(views(__dirname + '/views', {
@@ -40,19 +23,29 @@ app.use(views(__dirname + '/views', {
 
 // logger
 app.use(async (ctx, next) => {
+  // 使用封装好的 log4js 打印调试请求信息
+  logger.debug(`GET param: ${ctx.request.querystring}`)
+  logger.debug(`POST data: ${ctx.request.body}`)
   const start = new Date()
   await next()
   const ms = new Date() - start
-  // console.log(`${ctx.method} ${ctx.url} - ${ms}ms`)
 })
 
 // routes
-app.use(index.routes(), index.allowedMethods())
+// 引入路由对象
+const router = require('koa-router')()
+// 创建根路由
+router.prefix('/api')
+// 使用根路由
+app.use(router.routes(), router.allowedMethods())
+// 引入用户管理路由模块
+const users = require('./routes/users')
 app.use(users.routes(), users.allowedMethods())
 
 // error-handling
 app.on('error', (err, ctx) => {
-  // console.error('server error', err, ctx)
+  // 使用封装好的 log4js 处理记录错误日志
+  logger.error({err, ctx})
 });
 
 module.exports = app
