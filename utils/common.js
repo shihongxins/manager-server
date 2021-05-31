@@ -1,4 +1,5 @@
 /**
+ * @file /utils/common.js
  * @description 通用工具函数
  */
 
@@ -7,6 +8,9 @@
  */
 const logger = require('./log')
 
+/**
+ * @description 约定的响应状态码
+ */
 const CODE = {
   SUCCESS: 200, // 成功
   PARAM_ERROR: 10001, // 参数错误
@@ -17,6 +21,7 @@ const CODE = {
 }
 
 module.exports = {
+  CODE,
   /**
    * @description 分页起点信息计算
    * @param {Number} page 
