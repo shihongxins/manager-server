@@ -38,7 +38,7 @@ app.use(async (ctx, next) => {
     // 捕获 koa-jwt 认证 token 失败抛出的异常
     if (err.status === 401) {
       ctx.status = 200
-      ctx.body = common.fail("Token 过期或认证失败，请重新登录", common.CODE.AUTH_ERROR)
+      ctx.body = common.fail("Token 过期或认证失败，请重新登录", "", common.CODE.AUTH_ERROR)
     } else {
       throw err;
     }

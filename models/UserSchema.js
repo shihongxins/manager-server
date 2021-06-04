@@ -16,11 +16,11 @@ const UserSchema = mongoose.Schema({
   "state": {
     type: Number,
     default: 1
-  }, // 2: 在职 1: 试用期 0: 离职 
+  }, //  1: 试用期 2: 在职 3: 离职 
   "role": {
     type: Number,
     default: 0
-  }, // 用户角色 1：系统管理员  0： 普通用户
+  }, // 用户角色 0： 普通用户 1：系统管理员 
   "roleList": [], //系统角色
   "createTime": {
     type: Date,

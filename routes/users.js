@@ -4,8 +4,9 @@
  */
 // 引入模型层
 const User = require('../models/UserSchema')
+const Counter = require('../models/CounterSchema')
 // 引入响应处理工具函数
-const { CODE, success, fail } = require('../utils/common')
+const common = require('../utils/common')
 // 引入 项目自定义配置
 const config = require('../config/index')
 // 引入 JWT
@@ -14,6 +15,8 @@ const jwt = require('jsonwebtoken')
 const router = require('koa-router')()
 // 模块级路由
 router.prefix('/users')
+// 引入 MD5
+const md5 = require('md5')
 
 // 监听处理具体子路由事件
 /**
@@ -38,17 +41,108 @@ router.post('/login',async (ctx) => {
       userInfo.token = jwt.sign({
         data: userInfo
       }, config.token_secret, {
-        expiresIn: 60
+        expiresIn: '0.5h'
       })
       // 成功:返回包装数据为响应
-      ctx.body = success(userInfo)
+      ctx.body = common.success("登录成功", userInfo)
     } else {
       // 失败:返回错误信息
-      ctx.body = fail("账号或密码不正确！", CODE.ACCOUNT_ERROR)
+      ctx.body = common.fail("账号或密码不正确！", "", CODE.ACCOUNT_ERROR)
     }
   } catch (e) {
     // 数据库出错
-    ctx.body = fail(e.message)
+    ctx.body = common.fail("登录出错！", e)
+  }
+})
+
+/**
+ * @description 通过用户ID userId, 用户名 userName, 用户状态 state (1,2,3) 查询用户列表
+ */
+router.get('/list', async (ctx) => {
+  // 接收参数
+  const { userId, userName, state } = ctx.request.query
+  // 获取分页数据
+  let { pageNum, pageSize } = ctx.request.query
+  const { start, page, limit } = common.pager({page: pageNum, limit: pageSize})
+  pageNum = page
+  pageSize = limit
+  // 参数过滤筛选
+  const params = {}
+  if (userId) params.userId = userId
+  // ❗❗❗❗❗ mongoose 的模糊查询
+  if (userName) params.userName = { $regex: new RegExp(`${userName}`, 'i') }
+  if (state && state!='0') params.state = state
+  try {
+    // 通过 mongoose 的数据模型层查询数据
+    const list = await User.find(params, { userPwd: 0 }).skip(start).limit(limit)
+    const total = await User.countDocuments(params)
+    // 返回结果
+    ctx.body = common.success("", { list, page: { pageNum, pageSize, total } })
+  } catch (e) {
+    ctx.body = common.fail("查询用户列表出错！", e)
+  }
+})
+
+/**
+ * @description 通过用户ID 组 userIds （批量）删除用户，不是硬删除，而是将状态改为离职[state=3]
+ */
+router.post('/delete', async (ctx) => {
+  // 接收参数
+  const { userIds } = ctx.request.body
+  if (userIds.length) {
+    try {
+      const res = await User.updateMany({ userId: { $in: userIds } }, { state: 3 })
+      if (res.nModified === userIds.length) {
+        ctx.body = common.success("成功删除 "+ res.nModified + "条。", { nModified: res.nModified })
+      } else {
+        ctx.body = common.fail("删除用户失败！", res)
+      }
+    } catch (e) {
+      ctx.body = common.fail("查询用户列表出错!", e)
+    }
+  }
+})
+
+/**
+ * @description 新增或编辑用户
+ */
+router.post('/operate', async (ctx) => {
+  // 接收参数 userId,userName,userEmail,mobile,job,state,roleList,deptId,action,title
+  const { userId,userName,userEmail,mobile,job,state,roleList,deptId,action } = ctx.request.body
+  if (!(userName && userEmail && deptId)) {
+    ctx.body = common.fail("缺少必要参数！", {}, common.CODE.PARAM_ERROR)
+    return
+  }
+  let res,title = "新增/编辑用户"
+  try {
+    if (action === 'edit') {
+      title = "编辑用户"
+      res = await User.updateOne({ userId }, { mobile,job,state,roleList,deptId })
+      ctx.body = common.success(title + "成功！", { nModified: 1 })
+    } else if (action==='add') {
+      title = "新增用户"
+      const check = await User.findOne({ $or: [{ userName }, { userEmail }] }, '_id userName userEmail')
+      if (check && check._id) {
+        ctx.body = common.fail(`用户信息重复：名称 ${check.userName} 邮箱 ${check.userEmail} 。`)
+      } else {
+        const counter = await Counter.findOneAndUpdate({ _id: "userId" }, { $inc: { sequence: 1 } }, { new: true })
+        const user = new User({
+          userId: counter.sequence,
+          userName,
+          userPwd: md5(`${userName}123456`),
+          userEmail,
+          mobile,
+          job,
+          state,
+          roleList,
+          deptId
+        })
+        user.save()
+        ctx.body = common.success(`${title}成功！`)
+      }
+    }
+  } catch (e) {
+    ctx.body = common.fail(title + "出错!", e)
   }
 })
 

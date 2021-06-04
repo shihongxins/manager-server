@@ -28,7 +28,7 @@ module.exports = {
    * @param {Number} limit 
    * @returns {Object} { start, page, limit }
    */
-  pager (page = 1, limit = 10) {
+  pager ({page = 1, limit = 10}) {
     page *= 1
     limit *= 1
     const start = (page - 1) * limit
@@ -40,24 +40,25 @@ module.exports = {
   },
   /**
    * @description 处理成功时，包装返回数据结构
-   * @param {*} data 
    * @param {String} msg 
+   * @param {*} data 
    * @param {Number} code 
-   * @returns {Object} { code, msg }
+   * @returns {Object} { code, msg , data }
    */
-  success (data = {}, msg = '', code = CODE.SUCCESS) {
-    const res = { code, data, msg }
+  success (msg = '', data = {}, code = CODE.SUCCESS) {
+    const res = { code, msg , data }
     logger.debug(res)
     return res
   },
   /**
    * @description 处理业务失败时，包装返回数据，并且记录日志
    * @param {String} msg 
+   * @param {*} data 
    * @param {Number} code 
-   * @returns {Object} { code, msg }
+   * @returns {Object} { code, msg , data }
    */
-  fail (msg = '', code = CODE.BUSINESS_ERROR) {
-    const res = { code, msg }
+  fail (msg = '', data = {}, code = CODE.BUSINESS_ERROR) {
+    const res = { code, msg , data }
     logger.error(res)
     return res
   }
