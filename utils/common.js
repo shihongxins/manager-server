@@ -61,6 +61,30 @@ module.exports = {
     const res = { code, msg , data }
     logger.error(res)
     return res
+  },
+  /**
+   * @description 递归遍历数组生成树结构菜单
+   * @param {array} list 原始数组（带 _id 与 parentId）
+   * @param {null|string|mongoose.Type.ObjectId} _id 当前节点的 _id
+   * @param {null|array} tree 子节点数组
+   * @returns {array} tree 树结构数组菜单
+   */
+  menuTree(list, _id, tree) {
+    tree = tree || []
+    list.forEach((_item) => {
+      const item = _item._doc
+      // 因为是 mongoose.Type.ObjectId 类型，得转为字符串比较
+      if (String(item.parentId.slice().pop()) == String(_id)) {
+        // 递归遍历查找子节点
+        item.children = this.menuTree(list, item._id, [])
+        // 如果它的子项是按钮，则拷贝一份子项用于权限区分
+        if (item.children.length > 0 && item.children[0].menuType === 2) {
+          item.actions = item.children
+        }
+        tree.push(item)
+      }
+    })
+    return tree
   }
 }
 

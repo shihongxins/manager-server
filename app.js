@@ -58,8 +58,12 @@ const router = require('koa-router')()
 router.prefix('/api')
 // 引入用户管理模块路由
 const users = require('./routes/users')
-// 根路由上挂载模块级路由
+// 根路由上挂载用户管理模块路由
 router.use(users.routes(), users.allowedMethods())
+// 引入菜单管理模块路由
+const menu = require('./routes/menu')
+// 根路由上挂载用户管理模块路由
+router.use(menu.routes(), menu.allowedMethods())
 // 最终挂载使用根路由
 app.use(router.routes(), router.allowedMethods())
 
