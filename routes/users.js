@@ -47,7 +47,7 @@ router.post('/login',async (ctx) => {
       ctx.body = common.success("登录成功", userInfo)
     } else {
       // 失败:返回错误信息
-      ctx.body = common.fail("账号或密码不正确！", "", CODE.ACCOUNT_ERROR)
+      ctx.body = common.fail("账号或密码不正确！", "", common.CODE.ACCOUNT_ERROR)
     }
   } catch (e) {
     // 数据库出错
@@ -93,7 +93,7 @@ router.post('/delete', async (ctx) => {
     try {
       const res = await User.updateMany({ userId: { $in: userIds } }, { state: 3 })
       if (res.nModified === userIds.length) {
-        ctx.body = common.success("成功删除 "+ res.nModified + "条。", { nModified: res.nModified })
+        ctx.body = common.success("成功删除 " + res.nModified + "条。", { result: (res.nModified || res.deletedCount || 1) })
       } else {
         ctx.body = common.fail("删除用户失败！", res)
       }
@@ -137,8 +137,8 @@ router.post('/operate', async (ctx) => {
           roleList,
           deptId
         })
-        user.save()
-        ctx.body = common.success(`${title}成功！`)
+        res = user.save()
+        ctx.body = common.success(`${title}成功！`, { result: (res.nModified || res.deletedCount || 1) })
       }
     }
   } catch (e) {

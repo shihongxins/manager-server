@@ -16,12 +16,17 @@ router.prefix('/menu')
  */
 router.get('/list', async (ctx) => {
   // 接收参数
-  const { menuName, menuState } = ctx.request.query
+  const {
+    menuName,
+    menuState
+  } = ctx.request.query
   // 参数过滤筛选
   const params = {}
   if (menuState !== undefined) params.menuState = menuState
   // ❗❗❗❗❗ mongoose 的模糊查询
-  if (menuName) params.menuName = { $regex: new RegExp(`${menuName}`, 'i') }
+  if (menuName) params.menuName = {
+    $regex: new RegExp(`${menuName}`, 'i')
+  }
   try {
     // 通过 mongoose 的数据模型层查询数据
     const list = await Menu.find(params)
@@ -38,7 +43,11 @@ router.get('/list', async (ctx) => {
  */
 router.post('/operate', async (ctx) => {
   // 获取操作类型与 _id 用于检验数据，剩下的信息用剩余参数存于 menuInfo 字段
-  const { action, _id, ...menuInfo } = ctx.request.body
+  const {
+    action,
+    _id,
+    ...menuInfo
+  } = ctx.request.body
   // 参数校验：如果未传入 action ['add', 'edit', 'delete'] 或者 未传入菜单名称 或者 是编辑或者删除时 _id 未传入
   if ((!action) ||
     (!menuInfo.menuName) ||
@@ -52,7 +61,15 @@ router.post('/operate', async (ctx) => {
     // 删除菜单及其子菜单
     if (action === 'delete') {
       title = '删除菜单及其子菜单'
-      res = await Menu.deleteMany({ $or: [{ _id }, { parentId: { $all: [_id] } }] })
+      res = await Menu.deleteMany({
+        $or: [{
+          _id
+        }, {
+          parentId: {
+            $all: [_id]
+          }
+        }]
+      })
     }
     // 编辑菜单
     if (action === 'edit') {
@@ -60,22 +77,35 @@ router.post('/operate', async (ctx) => {
       // 重设更新时间
       menuInfo.updateTime = new Date()
       // 根据 _id 字段更新 menuInfo (展开语法)
-      res = await Menu.updateMany({ _id }, { ...menuInfo })
+      res = await Menu.updateOne({
+        _id
+      }, {
+        ...menuInfo
+      })
     }
     // 新增菜单
     if (action === 'add') {
       title = '新增菜单'
       // 检查是否以已经存在
-      const check = await Menu.findOne({ menuName: menuInfo.menuName, menuType: menuInfo.menuType }, '_id menuName menuType')
+      const check = await Menu.findOne({
+        menuName: menuInfo.menuName,
+        menuType: menuInfo.menuType,
+        menuCode: menuInfo.menuCode
+      }, '_id menuName menuType')
       if (check && check._id) {
         ctx.body = common.fail(`重复新增菜单：名称 ${check.menuName} 类型 ${check.menuType == 1 ? '页面菜单' : '普通按钮'} 。`)
+        return
       } else {
-        res = await Menu.create({ ...menuInfo })
+        res = await Menu.create({
+          ...menuInfo
+        })
       }
     }
     // 判断操作结果
     if (res && (res.deletedCount > 0 || res.nModified > 0 || (res._id && action === 'add'))) {
-      ctx.body = common.success(`${title} -> [${menuInfo.menuName}] 成功。`, { nModified: res.nModified })
+      ctx.body = common.success(`${title} -> [${menuInfo.menuName}] 成功。`, {
+        result: (res.nModified || res.deletedCount || 1)
+      })
     } else {
       ctx.body = common.fail(`${title} -> [${menuInfo.menuName}] 失败！`, res)
     }

@@ -62,8 +62,12 @@ const users = require('./routes/users')
 router.use(users.routes(), users.allowedMethods())
 // 引入菜单管理模块路由
 const menu = require('./routes/menu')
-// 根路由上挂载用户管理模块路由
+// 根路由上挂载菜单管理模块路由
 router.use(menu.routes(), menu.allowedMethods())
+// 引入角色管理模块路由
+const role = require('./routes/role')
+// 根路由上挂载角色管理模块路由
+router.use(role.routes(), role.allowedMethods())
 // 最终挂载使用根路由
 app.use(router.routes(), router.allowedMethods())
 
