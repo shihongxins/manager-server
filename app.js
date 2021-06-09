@@ -68,6 +68,10 @@ router.use(menu.routes(), menu.allowedMethods())
 const role = require('./routes/role')
 // 根路由上挂载角色管理模块路由
 router.use(role.routes(), role.allowedMethods())
+// 引入部门管理模块路由
+const dept = require('./routes/dept')
+// 根路由上挂载部门管理模块路由
+router.use(dept.routes(), dept.allowedMethods())
 // 最终挂载使用根路由
 app.use(router.routes(), router.allowedMethods())
 

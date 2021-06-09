@@ -1,5 +1,5 @@
 /**
- * @file /routes/Role.js
+ * @file /routes/role.js
  * @description 角色管理模块——控制层
  */
 // 引入模型层
@@ -46,7 +46,7 @@ router.post('/operate', async (ctx) => {
   // 参数校验：如果未传入 action ['add', 'edit', 'delete'] 或者 未传入角色名称 或者 是编辑或者删除时 _id 未传入
   if ((!action) ||
     (!roleName) ||
-    ((action === 'edit' || action === 'delete') && (!_id))) {
+    ((action === 'edit' || action === 'delete' || action === 'setPermission') && (!_id))) {
     ctx.body = common.fail("缺少必要参数！", {}, common.CODE.PARAM_ERROR)
     return
   }
