@@ -34,7 +34,8 @@ router.post('/login',async (ctx) => {
      * 2、 第三个参数 {userName:1,_id:0}
      * 3、 select 回调 .select('userName userPwd')
      */
-    const res = await User.findOne({ userName, userPwd }).select('userName userPwd')
+    // 因为数据库中用户密码使用 md5 加密，登录检验时也要加密
+    const res = await User.findOne({ userName, userPwd: md5(userPwd) }).select('userName userPwd')
     if (res) {
       const userInfo = res._doc;
       // 生成 token
@@ -68,10 +69,16 @@ router.get('/list', async (ctx) => {
   pageSize = limit
   // 参数过滤筛选
   const params = {}
-  if (userId) params.userId = userId
+  if (userId) {
+    params.userId = userId
+  }
   // ❗❗❗❗❗ mongoose 的模糊查询
-  if (userName) params.userName = { $regex: new RegExp(`${userName}`, 'i') }
-  if (state && state!='0') params.state = state
+  if (userName) {
+    params.userName = { $regex: new RegExp(`${decodeURI(userName)}`, 'i') }
+  }
+  if (state && state != '0') {
+    params.state = state
+  }
   try {
     // 通过 mongoose 的数据模型层查询数据
     const list = await User.find(params, { userPwd: 0 }).skip(start).limit(limit)
@@ -91,14 +98,23 @@ router.post('/delete', async (ctx) => {
   const { userIds } = ctx.request.body
   if (userIds.length) {
     try {
-      const res = await User.updateMany({ userId: { $in: userIds } }, { state: 3 })
-      if (res.nModified === userIds.length) {
-        ctx.body = common.success("成功删除 " + res.nModified + "条。", { result: (res.nModified || res.deletedCount || 1) })
-      } else {
-        ctx.body = common.fail("删除用户失败！", res)
+      // 只能删除普通用户 role = 0
+      // 其他状态的“删除”是将状态改为离职
+      let res = await User.updateMany({ userId: { $in: userIds }, role: 0 }, { state: 3 })
+      if (res.ok > 0 && res.nModified) {
+        ctx.body = common.success("成功删除 " + res.nModified + "条。", { nModified: res.nModified })
+        return
       }
+      // 已经是 离职 state = 3 的，再次执行“删除”是真的删除
+      res = await User.deleteMany({ userId: { $in: userIds }, role: 0, state: 3 })
+      if (res.ok > 0 && res.deletedCount > 0) {
+        ctx.body = common.success("成功删除 " + res.deletedCount + "条。", { nModified: res.deletedCount })
+        return
+      }
+      // 否则删除失败
+      ctx.body = common.fail("删除用户失败！", res)
     } catch (e) {
-      ctx.body = common.fail("查询用户列表出错!", e)
+      ctx.body = common.fail("删除用户出错!", e)
     }
   }
 })
@@ -118,8 +134,14 @@ router.post('/operate', async (ctx) => {
     if (action === 'edit') {
       title = "编辑用户"
       res = await User.updateOne({ userId }, { mobile,job,state,roleList,deptId })
-      ctx.body = common.success(title + "成功！", { nModified: 1 })
-    } else if (action==='add') {
+      if (res.ok) {
+        ctx.body = common.success(title + "成功！", { nModified: 1 })
+      } else {
+        ctx.body = common.fail(title + "失败！", res)
+      }
+      return
+    }
+    if (action === 'add') {
       title = "新增用户"
       const check = await User.findOne({ $or: [{ userName }, { userEmail }] }, '_id userName userEmail')
       if (check && check._id) {
@@ -137,8 +159,12 @@ router.post('/operate', async (ctx) => {
           roleList,
           deptId
         })
-        res = user.save()
-        ctx.body = common.success(`${title}成功！`, { result: (res.nModified || res.deletedCount || 1) })
+        newUser = await user.save()
+        if (newUser && newUser._id) {
+          ctx.body = common.success(`${title}成功！`, newUser)
+        } else {
+          ctx.body = common.fail(title + "失败！", newUser)
+        }
       }
     }
   } catch (e) {

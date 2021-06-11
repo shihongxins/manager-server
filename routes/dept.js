@@ -20,13 +20,15 @@ router.get('/list', async (ctx) => {
   // 参数过滤筛选
   const params = {}
   // ❗❗❗❗❗ mongoose 的模糊查询
-  if (deptName) params.deptName = {
-    $regex: new RegExp(`${deptName}`, 'i')
+  if (deptName) {
+    params.deptName = {
+      $regex: new RegExp(`${decodeURI(deptName)}`, 'i')
+    }
   }
   try {
     // 通过 mongoose 的数据模型层查询数据
     const list = await Dept.find(params)
-    const tree = common.menuTree(list)
+    const tree = common.deepTree(list)
     // 返回结果
     ctx.body = common.success("", tree)
   } catch (e) {
@@ -97,9 +99,7 @@ router.post('/operate', async (ctx) => {
     }
     // 判断操作结果
     if (res && (res.deletedCount > 0 || res.nModified > 0 || (res._id && action === 'add'))) {
-      ctx.body = common.success(`${title} -> [${deptInfo.deptName}] 成功。`, {
-        result: (res.nModified || res.deletedCount || 1)
-      })
+      ctx.body = common.success(`${title} -> [${deptInfo.deptName}] 成功。`, res)
     } else {
       ctx.body = common.fail(`${title} -> [${deptInfo.deptName}] 失败！`, res)
     }

@@ -22,15 +22,17 @@ router.get('/list', async (ctx) => {
   } = ctx.request.query
   // 参数过滤筛选
   const params = {}
-  if (menuState !== undefined) params.menuState = menuState
+  if (menuState !== undefined) {
+    params.menuState = menuState
+  }
   // ❗❗❗❗❗ mongoose 的模糊查询
   if (menuName) params.menuName = {
-    $regex: new RegExp(`${menuName}`, 'i')
+    $regex: new RegExp(`${decodeURI(menuName)}`, 'i')
   }
   try {
     // 通过 mongoose 的数据模型层查询数据
     const list = await Menu.find(params)
-    const tree = common.menuTree(list)
+    const tree = common.deepTree(list)
     // 返回结果
     ctx.body = common.success("", tree)
   } catch (e) {
@@ -103,9 +105,7 @@ router.post('/operate', async (ctx) => {
     }
     // 判断操作结果
     if (res && (res.deletedCount > 0 || res.nModified > 0 || (res._id && action === 'add'))) {
-      ctx.body = common.success(`${title} -> [${menuInfo.menuName}] 成功。`, {
-        result: (res.nModified || res.deletedCount || 1)
-      })
+      ctx.body = common.success(`${title} -> [${menuInfo.menuName}] 成功。`, res)
     } else {
       ctx.body = common.fail(`${title} -> [${menuInfo.menuName}] 失败！`, res)
     }

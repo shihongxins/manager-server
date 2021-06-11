@@ -12,7 +12,7 @@ const router = require('koa-router')()
 router.prefix('/role')
 
 /**
- * @description 通过角色名称 查询角色列表
+ * @description 通过角色名称 查询角色列表（详细信息带权限）
  */
 router.get('/list', async (ctx) => {
   // 接收参数
@@ -25,13 +25,27 @@ router.get('/list', async (ctx) => {
   // 参数过滤筛选
   const params = {}
   // ❗❗❗❗❗ mongoose 的模糊查询
-  if (roleName) params.roleName = { $regex: new RegExp(`${roleName}`, 'i') }
+  if (roleName) {
+    params.roleName = { $regex: new RegExp(`${decodeURI(roleName)}`, 'i') }
+  }
   try {
     // 通过 mongoose 的数据模型层查询数据
     const list = await Role.find(params).skip(start).limit(limit)
     const total = await Role.countDocuments(params)
     // 返回结果
     ctx.body = common.success("", { list, page: { pageNum, pageSize, total } })
+  } catch (e) {
+    ctx.body = common.fail("查询角色列表出错！", e)
+  }
+})
+
+/**
+ * @description 获取全部角色列表（简易信息）
+ */
+router.get('/alllist', async (ctx) => {
+  try {
+    const list = await Role.find({}, '_id roleName')
+    ctx.body = common.success("", list)
   } catch (e) {
     ctx.body = common.fail("查询角色列表出错！", e)
   }
@@ -83,8 +97,7 @@ router.post('/operate', async (ctx) => {
     }
     // 判断操作结果
     if (res && (res.deletedCount > 0 || res.nModified > 0 || (res._id && action === 'add'))) {
-      console.log(res);
-      ctx.body = common.success(`${title} -> [${roleName}] 成功。`, { result: (res.nModified || res.deletedCount || 1) })
+      ctx.body = common.success(`${title} -> [${roleName}] 成功。`, res)
     } else {
       ctx.body = common.fail(`${title} -> [${roleName}] 失败！`, res)
     }
