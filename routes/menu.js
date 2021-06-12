@@ -32,7 +32,8 @@ router.get('/list', async (ctx) => {
   try {
     // 通过 mongoose 的数据模型层查询数据
     const list = await Menu.find(params)
-    const tree = common.deepTree(list)
+    // 有搜索条件，直接返回查询结果，没有搜索条件返回组成树结构
+    const tree = (menuName && menuName.length) ? list : common.deepTree(list)
     // 返回结果
     ctx.body = common.success("", tree)
   } catch (e) {

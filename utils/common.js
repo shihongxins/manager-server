@@ -88,6 +88,10 @@ module.exports = {
         tree.push(item)
       }
     })
+    // 如果没有传入 _id ，即第一次循环，却没有产生树的根节点，多半是搜索结果为多项无关联，直接返回原搜索数组
+    if (!_id && tree.length == 0) {
+      tree = list
+    }
     return tree
   }
 }
