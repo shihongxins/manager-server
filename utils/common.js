@@ -7,6 +7,8 @@
  * @description 封装 log4js 日志存储对象 logger
  */
 const logger = require('./log')
+// 引入 JWT
+const jwt = require('jsonwebtoken')
 
 /**
  * @description 约定的响应状态码
@@ -93,6 +95,22 @@ module.exports = {
       tree = list
     }
     return tree
+  },
+  /**
+   * 
+   * @param {string} authorization 
+   * @returns jwt token data
+   */
+  decodeTokenData(authorization) {
+    let data = {}
+    const auth = authorization.split(' ')
+    if (auth.length === 2 && auth[0] === 'Bearer') {
+      const token = jwt.decode(auth[1])
+      if (token && token.data) {
+        data = token.data
+      }
+    }
+    return data
   }
 }
 

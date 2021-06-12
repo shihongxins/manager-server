@@ -4,6 +4,10 @@
  */
 // 引入模型层
 const Menu = require('../models/MenuSchema')
+// 引入模型层
+const User = require('../models/UserSchema')
+// 引入模型层
+const Role = require('../models/RoleSchema')
 // 引入响应处理工具函数
 const common = require('../utils/common')
 // 引入并注册路由
@@ -112,6 +116,54 @@ router.post('/operate', async (ctx) => {
     }
   } catch (e) {
     ctx.body = common.fail(title + "出错!", e)
+  }
+})
+
+/**
+ * @description 动态权限菜单：根据 token 获取已登录用户的角色信息，进而通过角色信息获取权限可访问的菜单及按钮列表
+ */
+router.get('/permissionMenuList', async (ctx) => {
+  const authorization = ctx.request.headers.authorization
+  const tokenData = common.decodeTokenData(authorization)
+  if (tokenData && tokenData._id) {
+    try {
+      const userInfo = await User.findById(tokenData._id)
+      if (userInfo && userInfo.roleList) {
+        let menuList = []
+        if (userInfo.role === 1) {
+          // 系统管理员拥有全部菜单权限
+          const list = await Menu.find({})
+          menuList = common.deepTree(list)
+        } else {
+          let permissionList = []
+          // 普通用户通过自身的角色 id 查询角色信息
+          const roleInfoList = await Role.find({ _id: { $in: userInfo.roleList } })
+          // 遍历角色信息，组成权限列表
+          roleInfoList.forEach((roleInfo) => {
+            if (roleInfo.rolePermission) {
+              if (roleInfo.rolePermission.checkedPages) {
+                permissionList.push(...roleInfo.rolePermission.checkedPages)
+              }
+              if (roleInfo.rolePermission.checkedBtns) {
+                permissionList.push(...roleInfo.rolePermission.checkedBtns)
+              }
+            }
+          })
+          // 多角色权限列表去重
+          permissionList = [...new Set(permissionList)]
+          // 然后通过权限列表查询菜单权限
+          const list = await Menu.find({ _id: { $in: permissionList } })
+          menuList = common.deepTree(list)
+        }
+        ctx.body = common.success("", menuList)
+      } else {
+        ctx.body = common.fail("查询用户角色列表出错！", userInfo)
+      }
+    } catch (e) {
+      ctx.body = common.fail("查询权限菜单出错！", e)
+    }
+  } else {
+    ctx.body = common.fail("认证失败，获取权限菜单出错！")
   }
 })
 
