@@ -122,18 +122,21 @@ router.post('/operate', async (ctx) => {
 /**
  * @description 动态权限菜单：根据 token 获取已登录用户的角色信息，进而通过角色信息获取权限可访问的菜单及按钮列表
  */
-router.get('/permissionMenuList', async (ctx) => {
+router.get('/permissionList', async (ctx) => {
   const authorization = ctx.request.headers.authorization
   const tokenData = common.decodeTokenData(authorization)
   if (tokenData && tokenData._id) {
     try {
       const userInfo = await User.findById(tokenData._id)
       if (userInfo && userInfo.roleList) {
+        let list = []
+        // 权限动态菜单
         let menuList = []
+        // 权限动态按钮
+        let btnList = []
         if (userInfo.role === 1) {
           // 系统管理员拥有全部菜单权限
-          const list = await Menu.find({})
-          menuList = common.deepTree(list)
+          list = await Menu.find({})
         } else {
           let permissionList = []
           // 普通用户通过自身的角色 id 查询角色信息
@@ -152,10 +155,19 @@ router.get('/permissionMenuList', async (ctx) => {
           // 多角色权限列表去重
           permissionList = [...new Set(permissionList)]
           // 然后通过权限列表查询菜单权限
-          const list = await Menu.find({ _id: { $in: permissionList } })
-          menuList = common.deepTree(list)
+          list = await Menu.find({ _id: { $in: permissionList } })
         }
-        ctx.body = common.success("", menuList)
+        // 从全部菜单中区分 菜单列表 与 按钮列表
+        list.forEach((item) => {
+          if (item.menuType === 1) {
+            menuList.push(item)
+          } else if (item.menuType === 2) {
+            btnList.push(item)
+          }
+        })
+        // 将菜单列表转为菜单树
+        menuList = common.deepTree(menuList)
+        ctx.body = common.success("", { menuList, btnList })
       } else {
         ctx.body = common.fail("查询用户角色列表出错！", userInfo)
       }
