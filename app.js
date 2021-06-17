@@ -72,6 +72,10 @@ router.use(role.routes(), role.allowedMethods())
 const dept = require('./routes/dept')
 // 根路由上挂载部门管理模块路由
 router.use(dept.routes(), dept.allowedMethods())
+// 引入休假申请模块路由
+const leave = require('./routes/leave')
+// 根路由上挂载休假申请模块路由
+router.use(leave.routes(), leave.allowedMethods())
 // 最终挂载使用根路由
 app.use(router.routes(), router.allowedMethods())
 
