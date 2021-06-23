@@ -73,6 +73,27 @@ router.get('/list', async (ctx) => {
 })
 
 /**
+ * @description 查询当前用户待我审批的数量作为通知数量
+ */
+router.get('/count', async (ctx) => {
+  let total = 0;
+  // 认证登录用户信息
+  const { authorization } = ctx.request.headers
+  const tokenData = common.decodeTokenData(authorization)
+  if (tokenData && tokenData.userId) {
+    const params = {
+      $or: [{ applyState: 1 }, { applyState: 2 }],
+      "currentFlowUser.userId": tokenData.userId
+    }
+    total = await Leave.countDocuments(params)
+  } else {
+    ctx.body = common.fail("查询已登录用户信息出错！", tokenData, common.CODE.AUTH_ERROR)
+    return
+  }
+  ctx.body = common.success("", total)
+});
+
+/**
  * @description 新增申请，撤销作废申请
  */
 router.post('/operate', async (ctx) => {
@@ -164,7 +185,7 @@ router.post('/operate', async (ctx) => {
       ctx.body = common.fail(`${title}出错！`, e)
     }
   } else {
-    ctx.body = common.fail("查询已登录用户信息出错！", userInfo)
+    ctx.body = common.fail("查询已登录用户信息出错！", tokenData, common.CODE.AUTH_ERROR)
   }
 })
 
@@ -231,7 +252,7 @@ router.post('/audit', async (ctx) => {
       ctx.body = common.fail(`${title}出错！`, e)
     }
   } else {
-    ctx.body = common.fail("查询已登录用户信息出错！", userInfo)
+    ctx.body = common.fail("查询已登录用户信息出错！", tokenData, common.CODE.AUTH_ERROR)
   }
 })
 

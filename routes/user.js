@@ -37,7 +37,7 @@ router.post('/login', async (ctx) => {
     // 因为数据库中用户密码使用 md5 加密，登录检验时也要加密
     const res = await User.findOne(
       { $or: [{ userName }, { userEmail: userName }], $or: [{ userPwd }, { userPwd: md5(userPwd) }] }
-    ).select('userId userName role state')
+    ).select('userId userName role state userEmail mobile job')
     if (res) {
       const userInfo = res._doc;
       // 生成 token
