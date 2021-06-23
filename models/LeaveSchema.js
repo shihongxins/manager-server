@@ -47,6 +47,9 @@ const LeaveSchema = mongoose.Schema({
     type: Number,
     default: 0,
   },
+  currentFlowUser: {
+    type: Object,
+  },
   // 审核日志
   auditLogs: {
     type: Array,

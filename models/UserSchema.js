@@ -33,4 +33,4 @@ const UserSchema = mongoose.Schema({
   remark: String
 })
 // 导出表结构创建的模型(导出模型名,表结构,数据库表名称 collection)
-module.exports = mongoose.model('Users', UserSchema, 'users')
+module.exports = mongoose.model('User', UserSchema, 'user')

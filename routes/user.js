@@ -1,5 +1,5 @@
 /**
- * @file /routes/users.js
+ * @file /routes/user.js
  * @description 用户管理模块——控制层
  */
 // 引入模型层
@@ -14,7 +14,7 @@ const jwt = require('jsonwebtoken')
 // 引入并注册路由
 const router = require('koa-router')()
 // 模块级路由
-router.prefix('/users')
+router.prefix('/user')
 // 引入 MD5
 const md5 = require('md5')
 
@@ -22,7 +22,7 @@ const md5 = require('md5')
 /**
  * @description 用户管理模块-用户登录
  */
-router.post('/login',async (ctx) => {
+router.post('/login', async (ctx) => {
   // 接收参数
   const { userName, userPwd } = ctx.request.body
   try {
@@ -36,7 +36,7 @@ router.post('/login',async (ctx) => {
      */
     // 因为数据库中用户密码使用 md5 加密，登录检验时也要加密
     const res = await User.findOne(
-      { userName, userPwd: md5(userPwd) }
+      { $or: [{ userName }, { userEmail: userName }], $or: [{ userPwd }, { userPwd: md5(userPwd) }] }
     ).select('userId userName role state')
     if (res) {
       const userInfo = res._doc;
@@ -50,7 +50,7 @@ router.post('/login',async (ctx) => {
       ctx.body = common.success("登录成功", userInfo)
     } else {
       // 失败:返回错误信息
-      ctx.body = common.fail("账号或密码不正确！", "", common.CODE.ACCOUNT_ERROR)
+      ctx.body = common.fail("账号或密码不正确！", res, common.CODE.ACCOUNT_ERROR)
     }
   } catch (e) {
     // 数据库出错
@@ -66,7 +66,7 @@ router.get('/list', async (ctx) => {
   const { userId, userName, state } = ctx.request.query
   // 获取分页数据
   let { pageNum, pageSize } = ctx.request.query
-  const { start, page, limit } = common.pager({page: pageNum, limit: pageSize})
+  const { start, page, limit } = common.pager({ page: pageNum, limit: pageSize })
   pageNum = page
   pageSize = limit
   // 参数过滤筛选
@@ -126,16 +126,16 @@ router.post('/delete', async (ctx) => {
  */
 router.post('/operate', async (ctx) => {
   // 接收参数 userId,userName,userEmail,mobile,job,state,roleList,deptId,action,title
-  const { userId,userName,userEmail,mobile,job,state,roleList,deptId,action } = ctx.request.body
+  const { userId, userName, userEmail, mobile, job, state, roleList, deptId, action } = ctx.request.body
   if (!(userName && userEmail && deptId)) {
     ctx.body = common.fail("缺少必要参数！", {}, common.CODE.PARAM_ERROR)
     return
   }
-  let res,title = "新增/编辑用户"
+  let res, title = "新增/编辑用户"
   try {
     if (action === 'edit') {
       title = "编辑用户"
-      res = await User.updateOne({ userId }, { mobile,job,state,roleList,deptId })
+      res = await User.updateOne({ userId }, { mobile, job, state, roleList, deptId })
       if (res.ok) {
         ctx.body = common.success(title + "成功！", { nModified: 1 })
       } else {
@@ -153,7 +153,7 @@ router.post('/operate', async (ctx) => {
         const user = new User({
           userId: counter.sequence,
           userName,
-          userPwd: md5(`${userName}123456`),
+          userPwd: md5(`${userEmail.split('@')[0]}123456`),
           userEmail,
           mobile,
           job,

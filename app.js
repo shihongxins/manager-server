@@ -47,7 +47,7 @@ app.use(async (ctx, next) => {
 // 使用 koa-jwt 中间件，在每次处理请求前验证 token ，注意排除登录与注册页，否则不能生成 token
 app.use(koajwt({ secret: config.token_secret }).unless({
   path: [
-    /^\/api\/users\/(login|register)/
+    /^\/api\/user\/(login|register)/
   ]
 }))
 
@@ -57,9 +57,9 @@ const router = require('koa-router')()
 // 创建根路由
 router.prefix('/api')
 // 引入用户管理模块路由
-const users = require('./routes/users')
+const user = require('./routes/user')
 // 根路由上挂载用户管理模块路由
-router.use(users.routes(), users.allowedMethods())
+router.use(user.routes(), user.allowedMethods())
 // 引入菜单管理模块路由
 const menu = require('./routes/menu')
 // 根路由上挂载菜单管理模块路由

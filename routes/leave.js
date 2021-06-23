@@ -21,32 +21,47 @@ router.prefix('/leave')
  */
 router.get('/list', async (ctx) => {
   // 接收参数
-  const {
-    applyState
+  let {
+    applyState,
+    type
   } = ctx.request.query
+  applyState = parseInt(applyState)
   // 获取分页数据
   let { pageNum, pageSize } = ctx.request.query
   const { start, page, limit } = common.pager({ page: pageNum, limit: pageSize })
   pageNum = page
   pageSize = limit
-  // 参数过滤筛选
-  const params = {}
-  if (applyState > 0) {
-    params.applyState = applyState
-  }
   // 认证登录用户信息
   const { authorization } = ctx.request.headers
   const tokenData = common.decodeTokenData(authorization)
   if (tokenData && tokenData.userId && tokenData.role !== undefined) {
     try {
-      // 管理员查询所有数据
-      if (tokenData.role !== 1) {
-        // 非管理员查询自己申请的数据
-        params.applyUser = { userId: tokenData.userId }
+      // 参数过滤筛选
+      const params = {}
+      if (applyState > 0) {
+        // 待审批和审批中，两阶段本质相同
+        if (applyState === 1 || applyState === 2) {
+          params.$or = [{ applyState: 1 }, { applyState: 2 }]
+        } else {
+          params.applyState = applyState
+        }
+      }
+      if (type === 'audit') {
+        // 审核列表（审核）
+        if ([1, 2].includes(applyState)) {
+          // 如果是查询待审核/审核中 的数据，需要求当前审核人等于登录用户
+          params["currentFlowUser.userId"] = tokenData.userId
+        } else {
+          // 查询其他状态数据，就要求当前审批流程 **包含** 登录用户（❗❗❗❗❗注意 mongoose 包含关系的查询 auditFlows 是数组）
+          params["auditFlows.userId"] = tokenData.userId
+        }
+      } else {
+        // 申请列表（非审核）查询自己申请的
+        params["applyUser.userId"] = tokenData.userId
       }
       // 通过 mongoose 的数据模型层查询数据
-      const list = await Leave.find(params).skip(start).limit(limit)
-      const total = await Leave.countDocuments(params)
+      let list = await Leave.find(params).skip(start).limit(limit)
+      let total = await Leave.countDocuments(params)
       // 返回结果
       ctx.body = common.success("", { list, page: { pageNum, pageSize, total } })
     } catch (e) {
@@ -65,7 +80,7 @@ router.post('/operate', async (ctx) => {
   const { action, _id, ...leaveInfo } = ctx.request.body
   // 参数校验：如果未传入 action ['add', 'delete'] 或者 编辑或者删除时 _id 未传入
   if ((!action) ||
-    ((action === 'delete') && (!_id))
+    ((action === 'delete' || action === 'reject' || action === 'pass') && (!_id))
   ) {
     ctx.body = common.fail("缺少必要参数！", {}, common.CODE.PARAM_ERROR)
     return
@@ -76,22 +91,6 @@ router.post('/operate', async (ctx) => {
   if (tokenData && tokenData.userId) {
     let res, title = "新增/撤销并作废 休假申请"
     try {
-      // 撤销并作废休假申请
-      if (action === 'delete') {
-        title = '撤销作废休假申请'
-        const origin = await Leave.findById(_id)
-        if (origin && origin._id) {
-          origin.applyState = 5;
-          origin.updateTime = new Date();
-          res = await Leave.updateOne({ _id }, origin)
-          if (res && res.nModified) {
-            ctx.body = common.success(`${title}成功！`, res)
-            return
-          }
-        }
-        // 其他情况：作废失败
-        ctx.body = common.fail(`${title}失败！`, origin)
-      }
       // 新增休假申请
       if (action === 'add') {
         title = '新增休假申请'
@@ -100,7 +99,7 @@ router.post('/operate', async (ctx) => {
           const depts = await Dept.find({ _id: { $in: userInfo.deptId } })
           if (depts && depts.length) {
             // 审批流程
-            const auditFlows = depts.map((item) => item.userInfo)
+            const auditFlows = depts.map((item) => item.userInfo).reverse()
             // 申请单号
             const today = common.formatterDateTime(new Date(), 'yyyy-MM-dd 00:00:00')
             let count = await Leave.countDocuments({ createTime: { $gte: new Date(today) } })
@@ -111,10 +110,19 @@ router.post('/operate', async (ctx) => {
               applyNO,
               applyUser: tokenData,
               auditFlows,
+              currentFlowUser: auditFlows[0],
+              auditLogs: [{
+                ...tokenData,
+                action,
+                actionDesc: '新增',
+                actionTime: new Date(),
+                remark: title,
+              }]
             })
             const newLeave = await leave.save()
             if (newLeave && newLeave._id) {
               ctx.body = common.success(`${title}成功！`, newLeave)
+              return
             } else {
               ctx.body = common.fail(`${title}失败！`, newLeave)
             }
@@ -124,7 +132,101 @@ router.post('/operate', async (ctx) => {
         } else {
           ctx.body = common.fail(`${title}失败，当前登录用户所属部门为空，无法创建审批流程。`, userInfo)
         }
+        return
       }
+      const originInfo = await Leave.findById(_id)
+      // 1 待审批 与 2 审批中 的可被批准/驳回
+      if (originInfo && originInfo._id && originInfo.applyState < 3) {
+        // 撤销并作废休假申请
+        if (action === 'delete') {
+          title = '撤销作废休假申请'
+          let { applyState, auditLogs } = originInfo
+          applyState = 5;
+          auditLogs.push({
+            ...tokenData,
+            action,
+            actionDesc: '撤销作废',
+            actionTime: new Date(),
+            remark: title,
+          })
+          res = await Leave.updateOne({ _id }, { applyState, auditLogs, updateTime: new Date() })
+        }
+        if (res && res.nModified) {
+          ctx.body = common.success(`${title}成功！`, res)
+          return
+        }
+      } else {
+        ctx.body = common.fail(`撤销作废休假申请失败！非 待审批/审批中 的状态`, { res, originInfo })
+      }
+      // 其他情况：操作失败
+      ctx.body = common.fail(`${title}失败！`, { res, originInfo })
+    } catch (e) {
+      ctx.body = common.fail(`${title}出错！`, e)
+    }
+  } else {
+    ctx.body = common.fail("查询已登录用户信息出错！", userInfo)
+  }
+})
+
+router.post('/audit', async (ctx) => {
+  // 获取操作类型与 _id 用于检验数据，与备注 remark
+  const { action, _id, remark } = ctx.request.body
+  // 参数校验：如果未传入 action ['approve', 'reject'] 或者 编辑或者删除时 _id 未传入
+  if (['approve', 'reject'].indexOf(action) === -1 || (!_id)) {
+    ctx.body = common.fail("缺少必要参数！", {}, common.CODE.PARAM_ERROR)
+    return
+  }
+  // 认证登录用户信息
+  const { authorization } = ctx.request.headers
+  const tokenData = common.decodeTokenData(authorization)
+  if (tokenData && tokenData.userId) {
+    let res, title = "批准/驳回 休假申请"
+    try {
+      const originInfo = await Leave.findById(_id)
+      // 1 待审批 与 2 审批中 的可被批准/驳回
+      if (originInfo && originInfo._id && originInfo.applyState < 3) {
+        if (originInfo.currentFlowUser.userId === tokenData.userId) {
+          let { applyState, auditFlows, currentFlow, currentFlowUser, auditLogs } = originInfo
+          if (action === 'reject') {
+            // 驳回
+            title = '驳回休假申请'
+            applyState = 4
+          }
+          if (action === 'approve') {
+            title = '同意休假申请'
+            if (currentFlow === (auditFlows.length - 1)) {
+              // 流程结束，审批通过
+              applyState = 3;
+            } else {
+              // 审核中
+              applyState = 2;
+              // 进入下一流程
+              currentFlow++;
+              currentFlowUser = auditFlows[currentFlow]
+            }
+          }
+          auditLogs = auditLogs || [];
+          auditLogs.push({
+            ...tokenData,
+            action,
+            actionDesc: title,
+            actionTime: new Date(),
+            remark,
+          })
+          // 更新保存
+          res = await Leave.updateOne({ _id }, { applyState, currentFlow, currentFlowUser, auditLogs })
+          if (res && res.nModified) {
+            ctx.body = common.success(`${title}成功！`, res)
+            return
+          }
+        } else {
+          ctx.body = common.fail(`${title}失败！流程非当前用户审批`, { res, originInfo, tokenData })
+        }
+      } else {
+        ctx.body = common.fail(`${title}失败！非 待审批/审批中 的状态`, { res, originInfo })
+      }
+      // 其他情况：审批失败
+      ctx.body = common.fail(`${title}失败！`, { res, originInfo })
     } catch (e) {
       ctx.body = common.fail(`${title}出错！`, e)
     }
